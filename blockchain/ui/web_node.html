@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <meta content="ie=edge" http-equiv="X-UA-Compatible">
+    <title>Blockchain Management</title>
+    <link crossorigin="anonymous" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" rel="stylesheet">
+    <script crossorigin="anonymous" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+            src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <style>
+        .lds-ring {
+            display: inline-block;
+            position: relative;
+            width: 64px;
+            height: 64px;
+        }
+
+        .lds-ring div {
+            box-sizing: border-box;
+            display: block;
+            position: absolute;
+            width: 51px;
+            height: 51px;
+            margin: 6px;
+            border: 6px solid #fa923f;
+            border-radius: 50%;
+            animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            border-color: #fa923f transparent transparent transparent;
+        }
+
+        .lds-ring div:nth-child(1) {
+            animation-delay: -0.45s;
+        }
+
+        .lds-ring div:nth-child(2) {
+            animation-delay: -0.3s;
+        }
+
+        .lds-ring div:nth-child(3) {
+            animation-delay: -0.15s;
+        }
+
+        @keyframes lds-ring {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+
+
+    </style>
+</head>
+
+<body>
+<nav class="navbar navbar-expand-sm bg-dark navbar-dark">
+    <a class="navbar-brand" href="#">DMcoin</a>
+    <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+            <a class="nav-link" href="/pending_transactions">View Pending Transactions</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#">Settings</a>
+        </li>
+    </ul>
+</nav>
+<div id="app">
+    <div class="container">
+        <div class="row mb-3">
+            <div class="col">
+                <h1>Manage your Blockchain</h1>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <ul class="nav nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Wallet &amp; Node</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/network">Network</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <hr>
+        <div class="alert alert-danger" role="alert" v-if="error">
+            {{ error }}
+        </div>
+        <div class="alert alert-success" role="alert" v-if="success">
+            {{ success }}
+        </div>
+        <div class="row">
+            <div class="col">
+                <div v-if="!walletLoading">
+                    <button @click="onCreateWallet" class="btn btn-primary">
+                        Create new Wallet
+                    </button>
+                    <button @click="onLoadWallet" class="btn btn-primary">
+                        Load Wallet
+                    </button>
+                    <button class="btn btn-primary">
+                        Delete Wallet
+                    </button>
+                </div>
+
+                <div class="lds-ring" v-if="walletLoading">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+            </div>
+            <div class="col text-right">
+                <h2>Funds: {{ funds.toFixed(2) }}</h2>
+            </div>
+        </div>
+        <hr>
+        <div class="row" v-if="!wallet">
+            <div class="col">
+                <div class="alert alert-warning">Create a Wallet to start mining or other activities!</div>
+            </div>
+        </div>
+        <div class="row" v-if="wallet">
+            <div class="col">
+                <form @submit.prevent="onSendTx">
+                    <div class="form-group">
+                        <label for="recipient">Recipient Address</label>
+                        <input class="form-control" id="recipient" placeholder="Enter Recipient Address" type="text"
+                               v-model="outgoingTx.recipient">
+                        <small class="form-text text-muted">DMcoin Address Format</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Amount of Coins</label>
+                        <input class="form-control" id="amount" step="0.001" type="number"
+                               v-model.number="outgoingTx.coins">
+                        <small class="form-text text-muted">Fractions are possible (e.g. 5.67)</small>
+                        <label for="fees">Amount of Fees</label>
+                        <input class="form-control" id="fees" step="0.001" type="number"
+                               v-model.number="outgoingTx.fees">
+                        <small class="form-text text-muted">Fractions are possible (e.g. 5.67)</small>
+                        <label for="fees">Amount of Relay Fees</label>
+                        <input class="form-control" id="relay_fees" step="0.001" type="number"
+                               v-model.number="outgoingTx.relay_fees">
+                        <small class="form-text text-muted">Fractions are possible (e.g. 5.67)</small>
+                    </div>
+                    <div class="lds-ring" v-if="txLoading">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                    <button :disabled="txLoading || outgoingTx.recipient.trim() === '' || outgoingTx.coins <= 0 || outgoingTx.fees < 0 || outgoingTx.relay_fees < 0 || outgoingTx.coins < outgoingTx.fees || outgoingTx.coins < outgoingTx.relay_fees"
+                            class="btn btn-primary" type="submit">Send
+                    </button>
+                </form>
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a :class="{active: view === 'chain'}" @click="view = 'chain'" class="nav-link" href="#">Blockchain</a>
+                    </li>
+                    <li class="nav-item">
+                        <a :class="{active: view === 'tx'}" @click="view = 'tx'" class="nav-link" href="#">Pending
+                            Transactions</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="row my-3">
+            <div class="col">
+                <button @click="onLoadData" class="btn btn-primary">{{ view === 'chain' ? 'Load Blockchain' : 'Load
+                    Pending Transactions' }}
+                </button>
+                <button @click="onMine" class="btn btn-success" v-if="view === 'chain' && wallet">Mine Blocks</button>
+                <button @click="onSelfish" class="btn btn-warning">Selfish Mining</button>
+                <button @click="onResolve" class="btn btn-warning">Resolve Conflicts</button>
+                <button @click="onFilter" class="btn btn-warning">Filter Memory Pool</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <div class="lds-ring" v-if="dataLoading">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+                <div class="accordion" v-if="!dataLoading">
+                    <div class="card" v-for="(data, index) in loadedData">
+                        <div class="card-header" v-if="view === 'chain'">
+                            <h5 class="mb-0">
+                                <button @click="showElement === index ? showElement = null : showElement = index"
+                                        class="btn btn-link" type="button">
+                                    Block #{{ data.block_header.index }}
+                                </button>
+                            </h5>
+                        </div>
+                        <div :class="{show: showElement === index}" class="collapse" v-if="view === 'chain'">
+                            <div class="card">
+                                <ul class="list-group list-group-flush">
+
+                                    <li class="list-group-item">
+                                        <span class="">Version</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.version }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">Block ID</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.block_id }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">Previous Block Hash</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.prev_block_hash }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">PoW Hash</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.pow_hash }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">Merkle Tree Root</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.merkle_tree_root }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">Beneficiary</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.beneficiary }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">Difficulty</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.difficulty }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">Nonce</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.nonce }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">Hash Rate</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.hash_rate }}</small>
+                                        </div>
+                                    </li>
+
+                                    <li class="list-group-item">
+                                        <span class="">Timestamp</span><br>
+                                        <div class="text-truncate text-muted">
+                                            <small>{{ data.block_header.timestamp }}</small>
+                                        </div>
+                                    </li>
+                                </ul>
+                                <div class="list-group">
+                                    <div class="list-group-item flex-column align-items-start"
+                                         v-for="tx in data.transactions">
+                                        <span class="">Transaction ID</span>
+                                        <br>
+                                        <div class="text-truncate">
+                                            <small>{{ tx.transaction_id }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Sender</span>
+                                        <br>
+                                        <div class="text-truncate">
+                                            <small>{{ tx.sender }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Recipient</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ tx.recipient }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Coins</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ tx.coins }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Fees</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ tx.fees }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Relay Fees</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ tx.relay_fees }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Signature</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ tx.signature }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-header" v-if="view === 'tx'">
+                            <h5 class="mb-0">
+                                <button @click="showElement === index ? showElement = null : showElement = index"
+                                        class="btn btn-link" type="button">
+                                    Pending Transaction #{{ index }}
+                                </button>
+                            </h5>
+                        </div>
+                        <div :class="{show: showElement === index}" class="collapse" v-if="view === 'tx'">
+                            <div class="card-body">
+                                <div class="list-group">
+                                    <div class="list-group-item flex-column align-items-start">
+                                        <span class="">Transaction ID</span>
+                                        <br>
+                                        <div class="text-truncate">
+                                            <small>{{ data.transaction_id }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Sender</span>
+                                        <br>
+                                        <div class="text-truncate">
+                                            <small>{{ data.sender }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Recipient</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ data.recipient }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Coins</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ data.coins }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Fees</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ data.fees }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Relay Fees</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ data.relay_fees }}</small>
+                                        </div>
+                                        <br>
+                                        <span class="">Signature</span>
+                                        <br>
+                                        <div>
+                                            <small>{{ data.signature }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+        new Vue({
+            el: '#app',
+            data: {
+                blockchain: [
+
+                ],
+                openTransactions: [
+
+                ],
+                wallet: null,
+                view: 'chain',
+                walletLoading: false,
+                txLoading: false,
+                dataLoading: false,
+                showElement: null,
+                error: null,
+                success: null,
+                funds: 0,
+                outgoingTx: {
+                    recipient: '',
+                    coins: 0,
+                    fees: 0,
+                    relay_fees: 0
+                }
+            },
+            computed: {
+                loadedData: function () {
+                    if (this.view === 'chain') {
+                        return this.blockchain;
+                    } else {
+                        return this.openTransactions
+                    }
+                }
+            },
+            methods: {
+                onCreateWallet: function () {
+                    // Send Http request to create a new wallet (and return keys)
+                    var vm = this
+                    this.walletLoading = true
+                    axios.post('/wallet')
+                    .then(function(response) {
+                        vm.error = null
+                        vm.success = 'New wallet created!'
+                        vm.wallet = {
+                            user_address: response.data.user_address
+                        }
+                        vm.funds = response.data.funds
+                        vm.walletLoading = false
+                    })
+                    .catch(function(error) {
+                        vm.success = null
+                        vm.error = error.response.data.message
+                        vm.wallet = null
+                        vm.walletLoading = false
+                    });
+                },
+                onLoadWallet: function () {
+                    // Send Http request to load an existing wallet (from a file on the server)
+                    var vm = this
+                    this.walletLoading = true
+                    axios.get('/wallet')
+                    .then(function(response) {
+                        vm.error = null
+                        vm.success = 'Current wallet loaded!' + '\n' + 'User Address: ' + response.data.user_address
+                        vm.wallet = {
+                            user_address: response.data.user_address,
+                        }
+                        vm.funds = response.data.funds
+                        vm.walletLoading = false
+                    })
+                    .catch(function(error) {
+                        vm.success = null
+                        vm.error = error.response.data.message
+                        vm.wallet = null
+                        vm.walletLoading = false
+                    });
+                },
+                onSendTx: function () {
+                    // Send Transaction to backend
+                    var vm = this
+                    this.txLoading = true
+                    axios.post('/transaction', {
+                        recipient: this.outgoingTx.recipient,
+                        coins: this.outgoingTx.coins,
+                        fees: this.outgoingTx.fees,
+                        relay_fees: this.outgoingTx.relay_fees
+                    })
+                    .then(function(response) {
+                        vm.error = null
+                        vm.success = response.data.message
+                        vm.funds = response.data.funds
+                        vm.txLoading = false
+                    })
+                    .catch(function(error) {
+                        vm.success = null
+                        vm.error = error.response.data.message
+                        vm.txLoading = false
+                    });
+                },
+                onMine: function() {
+                    var vm = this
+                    axios.post('/mine')
+                        .then(function(response) {
+                            vm.error = null;
+                            vm.success = response.data.message;
+                            vm.funds = response.data.funds;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onSelfish: function() {
+                    var vm = this
+                    axios.post('/selfish-mining')
+                        .then(function(response) {
+                            vm.error = null;
+                            vm.success = response.data.message;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onResolve: function() {
+                    var vm = this
+                    axios.post('/resolve-conflicts')
+                        .then(function(response) {
+                            vm.error = null;
+                            vm.success = response.data.message;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onFilter: function() {
+                    var vm = this
+                    axios.post('/filter-mempool')
+                        .then(function(response) {
+                            vm.error = null;
+                            vm.success = response.data.message;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onLoadData: function () {
+                    if (this.view === 'chain') {
+                        // Load blockchain data
+                        var vm = this
+                        this.dataLoading = true
+                        axios.get('/blockchain')
+                            .then(function(response) {
+                                vm.blockchain = response.data
+                                vm.dataLoading = false
+                            })
+                            .catch(function(error) {
+                                vm.dataLoading = false
+                                vm.error = 'Something went wrong!'
+                            });
+                    } else {
+                        // Load transaction data
+                        var vm = this
+                        this.dataLoading = true
+                        axios.get('/transactions')
+                            .then(function(response) {
+                                vm.openTransactions = response.data.transactions
+                                vm.dataLoading = false
+                            })
+                            .catch(function(error) {
+                                vm.dataLoading = false
+                                vm.error = 'Something went wrong!'
+                            })
+                    }
+                }
+            }
+        })
+
+
+
+</script>
+</body>
+
+</html>

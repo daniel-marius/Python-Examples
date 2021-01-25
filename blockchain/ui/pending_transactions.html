@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pending Transactions</title>
+    <link crossorigin="anonymous" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" rel="stylesheet">
+    <script crossorigin="anonymous" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+            src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <style>
+        .lds-ring {
+            display: inline-block;
+            position: relative;
+            width: 64px;
+            height: 64px;
+        }
+
+        .lds-ring div {
+            box-sizing: border-box;
+            display: block;
+            position: absolute;
+            width: 51px;
+            height: 51px;
+            margin: 6px;
+            border: 6px solid #fa923f;
+            border-radius: 50%;
+            animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            border-color: #fa923f transparent transparent transparent;
+        }
+
+        .lds-ring div:nth-child(1) {
+            animation-delay: -0.45s;
+        }
+
+        .lds-ring div:nth-child(2) {
+            animation-delay: -0.3s;
+        }
+
+        .lds-ring div:nth-child(3) {
+            animation-delay: -0.15s;
+        }
+
+        @keyframes lds-ring {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+
+
+
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-sm bg-dark navbar-dark">
+    <a class="navbar-brand" href="#">DMcoin</a>
+    <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+            <a class="nav-link" href="/">Wallet &amp; Blocks</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#">Settings</a>
+        </li>
+    </ul>
+</nav>
+<br>
+<br>
+<br>
+
+<div id="app">
+    <div class="row">
+        <div class="list-group">
+            <div class="list-group-item flex-column align-items-start" v-for="tx in info">
+                <span class="">Transaction ID: {{ tx.transaction_id }}</span>
+                <br>
+                <span class="">Sender: {{ tx.sender }}</span>
+                <br>
+                <span class="">Recipient: {{ tx.recipient }}</span>
+                <br>
+                <span class="">Coins: {{ tx.coins }}</span>
+                <br>
+                <span class="">Fees: {{ tx.fees }}</span>
+                <br>
+                <span class="">Relay Fees: {{ tx.relay_fees }}</span>
+                <br>
+                <span class="">Signature: {{ tx.signature }}</span>
+                <br>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+<script>
+		new Vue({
+			el: '#app',
+			data () {
+				return {
+					info: []
+				}
+			},
+			mounted () {
+				axios
+				.get('/transactions')
+				.then(response => (this.info = response.data.transactions))
+			}
+		})
+
+
+
+
+</script>
+</body>
+
+</html>

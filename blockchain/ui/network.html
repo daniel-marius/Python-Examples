@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <meta content="ie=edge" http-equiv="X-UA-Compatible">
+    <title>Blockchain Management</title>
+    <link crossorigin="anonymous" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css"
+          integrity="sha384-9gVQ4dYFwwWSjIDZnLEWnxCjeSWFphJiwGPXr1jddIhOegiu1FwO5qRGvFXOdJZ4"
+          rel="stylesheet">
+</head>
+
+<body>
+
+<nav class="navbar navbar-expand-sm bg-dark navbar-dark">
+    <a class="navbar-brand" href="#">DMcoin</a>
+    <ul class="navbar-nav ml-auto">
+        <li class="nav-item">
+            <a class="nav-link" href="/pending_transactions">View Pending Transactions</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="#">Settings</a>
+        </li>
+    </ul>
+</nav>
+
+<div id="app">
+    <div class="container">
+        <div class="row mb-3">
+            <div class="col">
+                <h1>DMcoin Blockchain Explorer</h1>
+            </div>
+        </div>
+        <div class="alert alert-danger" role="alert" v-if="error">
+            {{ error }}
+        </div>
+        <div class="alert alert-success" role="alert" v-if="success">
+            {{ success }}
+        </div>
+        <div class="row">
+            <div class="col">
+                <ul class="nav nav-pills">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Wallet &amp; Blocks</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/network">Network</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col">
+                <form @submit.prevent="onAddNode">
+                    <div class="form-group">
+                        <label for="node-url">Node URL</label>
+                        <input class="form-control" id="node-url" placeholder="localhost:5001" type="text"
+                               v-model="newNodeUrl">
+                    </div>
+                    <button :disabled="newNodeUrl.trim() === ''" class="btn btn-primary" type="submit">Add</button>
+                </form>
+                <br>
+                <form @submit.prevent="sendValue">
+                    <button class="btn btn-info" type="submit">Broadcast Random String</button>
+                </form>
+                <br>
+                <button @click="onPeer" class="btn btn-info">Peer Discovery</button>
+                <br>
+                <br>
+                <button @click="onPeerAck" class="btn btn-info">Peer Acknowledgement</button>
+                <br>
+                <br>
+                <button class="btn btn-info">Leave Network</button>
+                <br>
+                <br>
+                <button @click="onCheck" class="btn btn-warning">Check Malicious Activity</button>
+                <br>
+            </div>
+        </div>
+        <hr>
+        <div class="row my-3">
+            <div class="col">
+                <button @click="onLoadNodes" class="btn btn-primary">Load Peer Nodes</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <ul class="list-group">
+                    <button @click="onRemoveNode(node)" class="list-group-item list-group-item-action"
+                            style="cursor: pointer;" v-for="node in nodes">
+                        {{ node }} (click to delete)
+                    </button>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.js"></script>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9/crypto-js.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9/hmac-sha256.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9/enc-base64.min.js"></script>
+<script>
+        new Vue({
+            el: '#app',
+            data: {
+                nodes: [],
+                newNodeUrl: '',
+                val: '',
+                error: null,
+                success: null
+            },
+            methods: {
+                randomString: function(length) {
+                    var result = '';
+                    var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+                    var charactersLength = characters.length;
+                    for (var i = 0; i < length; i++) {
+                        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+                    }
+                    return result;
+                },
+                generate_hmac: function() {
+
+                    var plainText = this.randomString(5);
+                    var secret = 'secret';
+                    var hash = CryptoJS.HmacSHA256(plainText, secret);
+                    var hashInBase64 = CryptoJS.enc.Base64.stringify(hash);
+                    var obj = {
+                        'plainText': plainText,
+                        'hmac': hashInBase64
+                    }
+                    console.log(obj);
+                    return obj;
+                },
+                onPeer: function () {
+                    var vm = this;
+                    axios.post('/peer-discovery', { hello_message: 'Peer Discovery' })
+                        .then(function (response) {
+                            vm.success = 'Peer Discovery!';
+                            vm.error = null;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onPeerAck: function () {
+                    var vm = this;
+                    axios.post('/peer', { ack: 'Peer Acknowledgement' })
+                        .then(function (response) {
+                            vm.success = 'Peer Acknowledgment!';
+                            vm.error = null;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onAddNode: function () {
+                    // Add node as peer node to local node server
+                    var vm = this;
+                    axios.post('/node', { node: this.newNodeUrl })
+                        .then(function (response) {
+                            vm.success = 'Stored node successfully!';
+                            vm.error = null;
+                            vm.nodes = response.data.all_nodes
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                sendValue: function () {
+                    var vm = this;
+                    axios.post('/value', { rand_value: this.generate_hmac() })
+                        .then(function (response) {
+                            vm.success = 'Stored value successfully!';
+                            vm.error = null;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onCheck: function() {
+                    var vm = this;
+                    axios.post('/check-activity')
+                        .then(function (response) {
+                            vm.error = null;
+                            vm.success = response.data.message;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onLoadNodes: function () {
+                    // Load all peer nodes of the local node server
+                    var vm = this;
+                    axios.get('/nodes')
+                        .then(function (response) {
+                            vm.success = 'Fetched nodes successfully!';
+                            vm.error = null;
+                            vm.nodes = response.data.all_nodes
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                },
+                onRemoveNode: function (node_url) {
+                    // Remove node as a peer node
+                    var vm = this;
+                    axios.delete('/node/' + node_url)
+                        .then(function (response) {
+                            vm.success = 'Deleted node successfully!';
+                            vm.error = null;
+                            vm.nodes = response.data.all_nodes
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        });
+                }
+            }
+        })
+
+
+
+
+</script>
+</body>
+
+</html>
