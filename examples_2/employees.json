@@ -1,0 +1,26 @@
+{
+  "employees": {
+    "data": [
+      {
+        "age": 33,
+        "doj": "06/06/2016",
+        "id": 1,
+        "manager_id": 33,
+        "name": "Emp1",
+        "salary": 30000,
+        "slab": "A"
+      },
+      {
+        "age": 27,
+        "doj": "07/07/2017",
+        "id": 2,
+        "manager_id": 33,
+        "name": "Emp2",
+        "salary": 25000,
+        "slab": "B"
+      }
+    ],
+    "department": "IT",
+    "location": "Dubai"
+  }
+}
